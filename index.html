@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculator & Vault</title>
+    <!-- Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Inter font for clean typography -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        /* Custom scrollbar for the file list */
+        .scrollbar-custom::-webkit-scrollbar {
+            width: 8px;
+        }
+        .scrollbar-custom::-webkit-scrollbar-track {
+            background: #e5e7eb;
+            border-radius: 10px;
+        }
+        .scrollbar-custom::-webkit-scrollbar-thumb {
+            background-color: #9ca3af;
+            border-radius: 10px;
+            border: 2px solid #e5e7eb;
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <!-- Main container for the app -->
+    <div id="app" class="w-full max-w-md bg-white rounded-2xl shadow-xl p-6">
+
+        <!-- Calculator UI -->
+        <div id="calculator-ui" class="space-y-4">
+            <h1 class="text-3xl font-bold text-center text-gray-800">Calculator</h1>
+            
+            <!-- Display screen -->
+            <div class="bg-gray-800 text-white rounded-xl p-4 text-right overflow-hidden shadow-inner">
+                <div id="display-history" class="text-lg text-gray-400 min-h-[1.5rem]"></div>
+                <div id="display-main" class="text-5xl font-light min-h-[3.5rem]">0</div>
+            </div>
+
+            <!-- Buttons Grid -->
+            <div class="grid grid-cols-4 gap-3">
+                <button class="col-span-2 btn bg-red-500 text-white hover:bg-red-600 transition-colors duration-200" data-value="clear">AC</button>
+                <button class="btn bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors duration-200" data-value="/">÷</button>
+                <button class="btn bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors duration-200" data-value="*">×</button>
+
+                <button class="btn" data-value="7">7</button>
+                <button class="btn" data-value="8">8</button>
+                <button class="btn" data-value="9">9</button>
+                <button class="btn bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors duration-200" data-value="-">-</button>
+
+                <button class="btn" data-value="4">4</button>
+                <button class="btn" data-value="5">5</button>
+                <button class="btn" data-value="6">6</button>
+                <button class="btn bg-gray-200 text-gray-800 hover:bg-gray-300 transition-colors duration-200" data-value="+">+</button>
+
+                <button class="btn" data-value="1">1</button>
+                <button class="btn" data-value="2">2</button>
+                <button class="btn" data-value="3">3</button>
+                <button class="row-span-2 btn bg-blue-500 text-white hover:bg-blue-600 transition-colors duration-200" data-value="=">=</button>
+
+                <button class="col-span-2 btn" data-value="0">0</button>
+                <button class="btn" data-value=".">.</button>
+            </div>
+        </div>
+
+        <!-- Vault UI (initially hidden) -->
+        <div id="vault-ui" class="hidden space-y-4">
+            <h1 class="text-3xl font-bold text-center text-gray-800">Secure Vault</h1>
+
+            <!-- Message box for alerts -->
+            <div id="message-box" class="hidden p-4 rounded-lg text-sm text-center font-medium transition-opacity duration-300"></div>
+
+            <div class="flex flex-col space-y-4">
+                <!-- File input section -->
+                <div class="flex items-center space-x-2">
+                    <input type="file" id="file-input" class="flex-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" multiple accept="image/*,video/*">
+                </div>
+
+                <!-- Action buttons -->
+                <div class="flex space-x-2">
+                    <button id="hide-btn" class="w-full py-3 px-4 rounded-full bg-blue-500 text-white font-semibold shadow-md hover:bg-blue-600 transition-colors duration-200">
+                        Hide Selected Files
+                    </button>
+                </div>
+            </div>
+
+            <!-- List of hidden files -->
+            <div class="bg-gray-100 p-4 rounded-xl shadow-inner max-h-60 overflow-y-auto scrollbar-custom">
+                <h2 class="text-xl font-semibold mb-2 text-gray-700">Hidden Files</h2>
+                <ul id="hidden-files-list" class="space-y-2">
+                    <!-- Dynamic list items will be added here -->
+                    <li class="text-gray-500 italic text-center">No files hidden yet.</li>
+                </ul>
+            </div>
+
+            <!-- Back button to return to calculator -->
+            <button id="back-btn" class="w-full py-3 px-4 rounded-full bg-gray-800 text-white font-semibold shadow-md hover:bg-gray-700 transition-colors duration-200">
+                Back to Calculator
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // Use an IIFE (Immediately Invoked Function Expression) to avoid polluting the global scope.
+        (function() {
+            // --- UI Element References ---
+            const calculatorUI = document.getElementById('calculator-ui');
+            const vaultUI = document.getElementById('vault-ui');
+            const displayMain = document.getElementById('display-main');
+            const displayHistory = document.getElementById('display-history');
+            const buttons = document.querySelectorAll('#calculator-ui .btn');
+            const fileInput = document.getElementById('file-input');
+            const hideBtn = document.getElementById('hide-btn');
+            const backBtn = document.getElementById('back-btn');
+            const hiddenFilesList = document.getElementById('hidden-files-list');
+            const messageBox = document.getElementById('message-box');
+
+            // --- State Variables ---
+            let currentInput = '0';
+            let history = '';
+            let lastOperator = '';
+            let lastValue = null;
+            let waitingForNewNumber = false;
+            const SECRET_CODE = '123456';
+            const hiddenFiles = []; // Array to store file data, including base64 for images
+
+            // --- Utility Functions ---
+            /**
+             * Updates the main display with the current input.
+             */
+            function updateDisplay() {
+                displayMain.textContent = currentInput;
+                displayHistory.textContent = history;
+            }
+
+            /**
+             * Shows a message in a custom message box UI.
+             * @param {string} message The message to display.
+             * @param {string} type The type of message ('success', 'error', 'info').
+             */
+            function showMessage(message, type) {
+                let bgColor, textColor;
+                switch (type) {
+                    case 'success':
+                        bgColor = 'bg-green-100';
+                        textColor = 'text-green-800';
+                        break;
+                    case 'error':
+                        bgColor = 'bg-red-100';
+                        textColor = 'text-red-800';
+                        break;
+                    case 'info':
+                    default:
+                        bgColor = 'bg-blue-100';
+                        textColor = 'text-blue-800';
+                        break;
+                }
+                messageBox.className = `p-4 rounded-lg text-sm text-center font-medium transition-opacity duration-300 opacity-100 ${bgColor} ${textColor}`;
+                messageBox.textContent = message;
+                messageBox.style.display = 'block';
+
+                setTimeout(() => {
+                    messageBox.style.opacity = '0';
+                    setTimeout(() => messageBox.style.display = 'none', 300);
+                }, 3000);
+            }
+
+            /**
+             * Toggles between the calculator and vault UIs.
+             */
+            function toggleUI() {
+                calculatorUI.classList.toggle('hidden');
+                vaultUI.classList.toggle('hidden');
+            }
+            
+            /**
+             * Handles calculator button clicks.
+             * @param {Event} event The click event.
+             */
+            function handleButtonClick(event) {
+                const buttonValue = event.target.dataset.value;
+                
+                if (!buttonValue) return;
+
+                if (event.target.classList.contains('btn')) {
+                    // Add a simple pressed effect
+                    event.target.classList.add('scale-95');
+                    setTimeout(() => event.target.classList.remove('scale-95'), 100);
+                }
+
+                // Handle clear button
+                if (buttonValue === 'clear') {
+                    currentInput = '0';
+                    history = '';
+                    lastOperator = '';
+                    lastValue = null;
+                    waitingForNewNumber = false;
+                } 
+                // Handle equals button
+                else if (buttonValue === '=') {
+                    if (currentInput === SECRET_CODE) {
+                        toggleUI();
+                    } else if (lastOperator && lastValue !== null) {
+                        const secondValue = parseFloat(currentInput);
+                        let result;
+                        switch (lastOperator) {
+                            case '+': result = lastValue + secondValue; break;
+                            case '-': result = lastValue - secondValue; break;
+                            case '*': result = lastValue * secondValue; break;
+                            case '/': result = lastValue / secondValue; break;
+                        }
+                        history += ` ${currentInput} =`;
+                        currentInput = result.toString();
+                        lastOperator = '';
+                        lastValue = null;
+                        waitingForNewNumber = true;
+                    }
+                } 
+                // Handle operator buttons
+                else if (['+', '-', '*', '/'].includes(buttonValue)) {
+                    if (lastOperator && !waitingForNewNumber) {
+                        // chained operations
+                        const secondValue = parseFloat(currentInput);
+                        let result;
+                        switch (lastOperator) {
+                            case '+': result = lastValue + secondValue; break;
+                            case '-': result = lastValue - secondValue; break;
+                            case '*': result = lastValue * secondValue; break;
+                            case '/': result = lastValue / secondValue; break;
+                        }
+                        currentInput = result.toString();
+                        lastValue = result;
+                    } else {
+                        lastValue = parseFloat(currentInput);
+                    }
+                    lastOperator = buttonValue;
+                    history = `${currentInput} ${buttonValue}`;
+                    waitingForNewNumber = true;
+                } 
+                // Handle number and decimal buttons
+                else {
+                    if (waitingForNewNumber) {
+                        currentInput = buttonValue;
+                        waitingForNewNumber = false;
+                    } else {
+                        if (currentInput === '0' && buttonValue !== '.') {
+                            currentInput = buttonValue;
+                        } else if (buttonValue === '.' && currentInput.includes('.')) {
+                            // Do nothing if decimal already exists
+                        } else {
+                            currentInput += buttonValue;
+                        }
+                    }
+                }
+
+                updateDisplay();
+            }
+
+            /**
+             * Renders the list of hidden files.
+             */
+            function renderHiddenFiles() {
+                hiddenFilesList.innerHTML = ''; // Clear the list
+                if (hiddenFiles.length === 0) {
+                    hiddenFilesList.innerHTML = '<li class="text-gray-500 italic text-center">No files hidden yet.</li>';
+                    return;
+                }
+
+                hiddenFiles.forEach((fileObj, index) => {
+                    const listItem = document.createElement('li');
+                    listItem.className = "p-2 rounded-lg bg-white shadow-sm flex flex-col space-y-2";
+                    
+                    let icon = '';
+                    if (fileObj.type.startsWith('image/')) {
+                        icon = '🖼️';
+                    } else if (fileObj.type.startsWith('video/')) {
+                        icon = '📹';
+                    } else {
+                        icon = '📄';
+                    }
+                    
+                    listItem.innerHTML = `
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-2">
+                                <span class="text-xl">${icon}</span>
+                                <span class="text-sm font-medium text-gray-700 truncate">${fileObj.name}</span>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button class="unhide-btn text-xs text-blue-500 hover:underline" data-index="${index}">Unhide</button>
+                                ${fileObj.type.startsWith('image/') ? `<button class="generate-desc-btn text-xs text-blue-500 hover:underline" data-index="${index}">Generate Description ✨</button>` : ''}
+                            </div>
+                        </div>
+                        <div id="description-${index}" class="text-xs text-gray-500 italic hidden"></div>
+                    `;
+
+                    hiddenFilesList.appendChild(listItem);
+                });
+
+                // Attach event listeners to the new buttons
+                document.querySelectorAll('.unhide-btn').forEach(btn => {
+                    btn.addEventListener('click', handleUnhideFile);
+                });
+                document.querySelectorAll('.generate-desc-btn').forEach(btn => {
+                    btn.addEventListener('click', handleGenerateDescription);
+                });
+            }
+
+            /**
+             * Handles the 'Hide' button click in the vault.
+             */
+            function handleHideFiles() {
+                const files = fileInput.files;
+                if (files.length === 0) {
+                    showMessage('Please select at least one file.', 'info');
+                    return;
+                }
+
+                const processFile = (file) => {
+                    return new Promise((resolve, reject) => {
+                        if (file.type.startsWith('image/')) {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                // Extract base64 data, removing the header
+                                const base64 = e.target.result.split(',')[1];
+                                hiddenFiles.push({
+                                    name: file.name,
+                                    type: file.type,
+                                    base64: base64
+                                });
+                                resolve();
+                            };
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        } else {
+                            hiddenFiles.push({
+                                name: file.name,
+                                type: file.type,
+                                base64: null // No base64 for videos
+                            });
+                            resolve();
+                        }
+                    });
+                };
+
+                Promise.all(Array.from(files).map(processFile))
+                    .then(() => {
+                        showMessage(`Successfully hid ${files.length} file(s).`, 'success');
+                        fileInput.value = ''; // Clear the input field
+                        renderHiddenFiles();
+                    })
+                    .catch(err => {
+                        console.error('Error processing files:', err);
+                        showMessage('Failed to hide files.', 'error');
+                    });
+            }
+
+            /**
+             * Handles the 'Unhide' button click.
+             * @param {Event} event The click event.
+             */
+            function handleUnhideFile(event) {
+                const index = parseInt(event.target.dataset.index);
+                if (!isNaN(index) && index >= 0 && index < hiddenFiles.length) {
+                    const fileObj = hiddenFiles[index];
+                    // Simulate unhiding by just removing from the list
+                    hiddenFiles.splice(index, 1);
+                    showMessage(`Successfully unhid "${fileObj.name}".`, 'success');
+                    renderHiddenFiles();
+                }
+            }
+
+            /**
+             * Generates a description for an image using the Gemini API.
+             * @param {string} base64ImageData The base64-encoded image data.
+             * @returns {Promise<string>} The generated description text.
+             */
+            async function generateImageDescription(base64ImageData) {
+                const prompt = "Generate a concise title (2-5 words) and a short one-sentence description of the image content. Format the response as: 'Title: [Title]\nDescription: [Description]'.";
+                
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+                
+                const payload = {
+                    contents: [
+                        {
+                            role: "user",
+                            parts: [
+                                { text: prompt },
+                                {
+                                    inlineData: {
+                                        mimeType: "image/png",
+                                        data: base64ImageData
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                };
+
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+                let response;
+                let retries = 0;
+                const maxRetries = 5;
+                const initialDelay = 1000; // 1 second
+
+                while (retries < maxRetries) {
+                    try {
+                        response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (response.status === 429) { // Too Many Requests
+                            const delay = initialDelay * Math.pow(2, retries);
+                            retries++;
+                            await new Promise(res => setTimeout(res, delay));
+                            continue;
+                        }
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const result = await response.json();
+                        if (result.candidates && result.candidates.length > 0 && result.candidates[0].content && result.candidates[0].content.parts && result.candidates[0].content.parts.length > 0) {
+                            return result.candidates[0].content.parts[0].text;
+                        } else {
+                            throw new Error('Invalid API response structure');
+                        }
+                    } catch (e) {
+                        console.error('API call failed:', e);
+                        throw e;
+                    }
+                }
+                throw new Error('API call failed after multiple retries.');
+            }
+
+            /**
+             * Handles the 'Generate Description' button click.
+             * @param {Event} event The click event.
+             */
+            async function handleGenerateDescription(event) {
+                const index = parseInt(event.target.dataset.index);
+                const fileObj = hiddenFiles[index];
+                const descriptionDiv = document.getElementById(`description-${index}`);
+
+                if (!fileObj || !fileObj.base64) {
+                    showMessage('Cannot generate description for this file type.', 'error');
+                    return;
+                }
+                
+                // Show a loading message
+                descriptionDiv.textContent = 'Generating description...';
+                descriptionDiv.classList.remove('hidden');
+
+                try {
+                    const description = await generateImageDescription(fileObj.base64);
+                    // Update the UI with the generated description
+                    descriptionDiv.textContent = description;
+                } catch (error) {
+                    console.error('Error generating image description:', error);
+                    descriptionDiv.textContent = 'Failed to generate description. Please try again.';
+                    showMessage('Failed to generate description.', 'error');
+                }
+            }
+
+            // --- Event Listeners ---
+            buttons.forEach(button => {
+                button.addEventListener('click', handleButtonClick);
+            });
+
+            hideBtn.addEventListener('click', handleHideFiles);
+            backBtn.addEventListener('click', toggleUI);
+
+            // Initial display update
+            updateDisplay();
+            renderHiddenFiles(); // Render the initial empty list
+
+        })();
+    </script>
+    <style>
+        .btn {
+            @apply p-4 rounded-xl text-2xl font-semibold text-gray-800 bg-gray-100 hover:bg-gray-200 transition-colors duration-200 shadow-md;
+        }
+        .btn[data-value="="] {
+            @apply h-full flex items-center justify-center;
+        }
+    </style>
+</body>
+</html>
